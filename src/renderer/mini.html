@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Dev Server - Mini</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      user-select: none;
+      overflow: hidden;
+      border: 1px solid #333;
+      border-radius: 12px;
+      position: relative;
+    }
+    
+    .mini-container {
+      height: 100vh;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      min-height: 140px;
+    }
+    
+    .mini-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      -webkit-app-region: drag;
+      position: relative;
+      z-index: 10;
+    }
+    
+    .project-name {
+      font-size: 14px;
+      font-weight: 600;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .close-btn {
+      width: 20px;
+      height: 20px;
+      background: #333;
+      border: none;
+      border-radius: 50%;
+      color: #999;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      -webkit-app-region: no-drag;
+      transition: all 0.2s;
+      position: relative;
+      z-index: 20;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+    
+    .close-btn:hover {
+      background: #444;
+      color: #fff;
+    }
+    
+    .status-section {
+      background: #111;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 44px;
+    }
+    
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #444;
+    }
+    
+    .status-dot.running {
+      background: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    }
+    
+    .status-text {
+      font-size: 13px;
+      flex: 1;
+    }
+    
+    .status-url {
+      color: #3b82f6;
+      text-decoration: none;
+      font-size: 12px;
+    }
+    
+    .status-url:hover {
+      text-decoration: underline;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: auto;
+    }
+    
+    .mini-btn {
+      flex: 1;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    
+    .mini-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .mini-btn.primary {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .mini-btn.primary:hover:not(:disabled) {
+      background: #2563eb;
+    }
+    
+    .mini-btn.danger {
+      background: #dc2626;
+      color: white;
+    }
+    
+    .mini-btn.danger:hover:not(:disabled) {
+      background: #b91c1c;
+    }
+    
+    .mini-btn.secondary {
+      background: #333;
+      color: white;
+    }
+    
+    .mini-btn.secondary:hover:not(:disabled) {
+      background: #444;
+    }
+    
+    .icon {
+      width: 14px;
+      height: 14px;
+    }
+    
+    .expand-btn {
+      position: fixed;
+      bottom: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      background: #222;
+      border: none;
+      border-radius: 4px;
+      color: #666;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      z-index: 10;
+    }
+    
+    .expand-btn:hover {
+      background: #333;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="mini-container">
+    <div class="mini-header">
+      <div class="project-name" id="projectName">Loading...</div>
+      <button class="close-btn" id="closeBtn">×</button>
+    </div>
+    
+    <div class="status-section">
+      <div class="status-dot" id="statusDot"></div>
+      <div class="status-text">
+        <div id="statusText">Loading...</div>
+        <a href="#" class="status-url" id="statusUrl" style="display: none;" target="_blank"></a>
+        <div id="runningTime" style="font-size: 11px; color: #666; margin-top: 2px; display: none;"></div>
+      </div>
+    </div>
+    
+    <div class="controls">
+      <button class="mini-btn primary" id="startBtn">
+        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+        </svg>
+        Start
+      </button>
+      <button class="mini-btn danger" id="stopBtn">
+        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6h12v12H6z"></path>
+        </svg>
+        Stop
+      </button>
+      <button class="mini-btn secondary" id="restartBtn">
+        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        Restart
+      </button>
+    </div>
+    
+    <button class="expand-btn" id="expandBtn" title="Open main window">
+      <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5h-4m4 0v-4m0 4l-5-5"></path>
+      </svg>
+    </button>
+  </div>
+  <script type="module" src="./mini.js"></script>
+</body>
+</html>

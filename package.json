@@ -1,0 +1,63 @@
+{
+  "name": "dev-server-manager",
+  "version": "1.7.4",
+  "description": "Lightweight development server manager",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc && tsc -p tsconfig.renderer.json || true && cp src/renderer/*.html dist/renderer/",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron .",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "electron": "^36.4.0",
+    "electron-builder": "^26.0.12",
+    "electron-store": "^10.0.1"
+  },
+  "dependencies": {
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "electron-updater": "^6.6.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "typescript": "^5.8.3"
+  },
+  "build": {
+    "appId": "com.devservermanager.app",
+    "productName": "Dev Server Manager",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
+}
