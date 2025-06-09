@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeImage } from 'electron';
 import { spawn, ChildProcess, exec, execSync } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -6,6 +6,7 @@ import { autoUpdater } from 'electron-updater';
 import * as http from 'http';
 import * as net from 'net';
 import { createMiniWindow, closeMiniWindow, updateMiniWindow } from './mini';
+import { platform } from './shared/platform';
 
 interface ServerProcess {
   process: ChildProcess;
@@ -30,22 +31,21 @@ let npmPath: string | null = null;
 
 // Find npm executable path
 function findNpmPath(): string {
-  const possiblePaths = [
-    '/usr/local/bin/npm',
-    '/opt/homebrew/bin/npm',
-    '/usr/bin/npm',
-    '/opt/local/bin/npm',
-    path.join(process.env.HOME || '', '.nvm/versions/node', 'current/bin/npm')
-  ];
+  const possiblePaths = platform.getNpmPath();
 
-  // Try to find npm using 'which' command
+  // Try to find npm using 'which' or 'where' command
   try {
-    const npmPathFromWhich = execSync('which npm', { encoding: 'utf8' }).trim();
-    if (npmPathFromWhich && fs.existsSync(npmPathFromWhich)) {
-      return npmPathFromWhich;
+    const findCommand = platform.isWindows ? 'where npm' : 'which npm';
+    const npmPathFromCommand = execSync(findCommand, { encoding: 'utf8' }).trim();
+    if (npmPathFromCommand) {
+      // On Windows, 'where' might return multiple paths, take the first one
+      const firstPath = npmPathFromCommand.split('\n')[0].trim();
+      if (fs.existsSync(firstPath)) {
+        return firstPath;
+      }
     }
   } catch (error) {
-    console.log('Could not find npm using which command');
+    console.log('Could not find npm using system command');
   }
 
   // Check common paths
@@ -56,9 +56,11 @@ function findNpmPath(): string {
   }
 
   // Last resort: try to find in PATH
-  const pathDirs = (process.env.PATH || '').split(':');
+  const pathSeparator = platform.isWindows ? ';' : ':';
+  const pathDirs = (process.env.PATH || '').split(pathSeparator);
   for (const dir of pathDirs) {
-    const npmPath = path.join(dir, 'npm');
+    const npmName = platform.isWindows ? 'npm.cmd' : 'npm';
+    const npmPath = path.join(dir, npmName);
     if (fs.existsSync(npmPath)) {
       return npmPath;
     }
@@ -67,24 +69,11 @@ function findNpmPath(): string {
   throw new Error('npm not found. Please ensure Node.js is installed.');
 }
 
+let tray: Tray | null = null;
+
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1000,
-    height: 700,
-    minWidth: 600,
-    minHeight: 400,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    },
-    titleBarStyle: 'hiddenInset',
-    vibrancy: 'sidebar',
-    backgroundColor: '#00000000',
-    resizable: true,
-    maximizable: true,
-    fullscreenable: true
-  });
+  const windowOptions = platform.getWindowOptions();
+  mainWindow = new BrowserWindow(windowOptions);
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   
@@ -93,6 +82,48 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+}
+
+// Create system tray for Windows/Linux
+function createTray() {
+  if (platform.isMac) {
+    return; // Mac uses the mini window in menu bar instead
+  }
+
+  const iconPath = platform.getAppIcon();
+  if (!iconPath) return;
+
+  tray = new Tray(iconPath);
+  
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show App',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+        } else {
+          createWindow();
+        }
+      }
+    },
+    {
+      label: 'Quit',
+      click: () => {
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setToolTip('Dev Server Manager');
+  tray.setContextMenu(contextMenu);
+  
+  tray.on('click', () => {
+    if (mainWindow) {
+      mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
+    } else {
+      createWindow();
+    }
   });
 }
 
@@ -107,6 +138,14 @@ app.whenReady().then(async () => {
   }
 
   createWindow();
+  
+  // Create tray for Windows/Linux
+  createTray();
+  
+  // Create mini window for macOS
+  if (platform.isMac) {
+    createMiniWindow();
+  }
   
   // Scan for external servers on startup
   await scanExternalServers();
@@ -129,19 +168,21 @@ function restartApp() {
   console.log('App path:', app.getPath('exe'));
   console.log('Is packaged:', app.isPackaged);
   
-  if (process.platform === 'darwin' && app.isPackaged) {
+  if (app.isPackaged) {
     const appPath = app.getPath('exe');
-    const appBundlePath = appPath.match(/^(.+\.app)\//)?.[1] || appPath;
-    console.log('App bundle path:', appBundlePath);
     
     // Close all windows first
     BrowserWindow.getAllWindows().forEach(window => {
       window.close();
     });
     
-    // Method 1: Shell script approach
-    const scriptPath = path.join(app.getPath('temp'), 'restart-dev-server.sh');
-    const script = `#!/bin/bash
+    if (platform.isMac) {
+      const appBundlePath = appPath.match(/^(.+\.app)\//)?.[1] || appPath;
+      console.log('App bundle path:', appBundlePath);
+      
+      // Method 1: Shell script approach
+      const scriptPath = path.join(app.getPath('temp'), 'restart-dev-server.sh');
+      const script = `#!/bin/bash
 sleep 1
 open -a "${appBundlePath}"
 rm -f "${scriptPath}"
@@ -448,7 +489,7 @@ ipcMain.handle('start-server', async (event, projectPath: string) => {
     const serverProcess = spawn(npmPath, ['run', command], {
       cwd: projectPath,
       env,
-      shell: false
+      shell: platform.getShell()
     });
 
     activeServers.set(projectPath, {
@@ -785,38 +826,9 @@ function isLikelyDevServer(command: string): boolean {
   return false;
 }
 
-// Get process info by port (macOS/Linux)
+// Get process info by port (cross-platform)
 async function getProcessInfoByPort(port: number): Promise<{ pid: number; command: string } | null> {
-  return new Promise((resolve) => {
-    // Use lsof command to find process using the port
-    exec(`lsof -ti:${port}`, (error, stdout) => {
-      if (error || !stdout.trim()) {
-        resolve(null);
-        return;
-      }
-
-      const pid = parseInt(stdout.trim());
-      
-      // Get full process command with arguments
-      exec(`ps -p ${pid} -o args= | head -1`, (error, stdout) => {
-        if (error) {
-          // Fallback to basic command
-          exec(`ps -p ${pid} -o comm=`, (error2, stdout2) => {
-            if (error2) {
-              resolve({ pid, command: 'Unknown' });
-            } else {
-              resolve({ pid, command: stdout2.trim() });
-            }
-          });
-          return;
-        }
-
-        const fullCommand = stdout.trim();
-        console.log(`Process on port ${port}: PID=${pid}, Command=${fullCommand}`);
-        resolve({ pid, command: fullCommand });
-      });
-    });
-  });
+  return platform.getProcessByPort(port);
 }
 
 // IPC handler to get external servers
@@ -834,8 +846,8 @@ ipcMain.handle('kill-external-server', async (event, port: number) => {
   try {
     console.log(`Attempting to kill process ${server.pid} on port ${port}`);
     
-    // First try SIGTERM
-    process.kill(server.pid, 'SIGTERM');
+    // Use platform-specific kill
+    platform.killProcess(server.pid);
     
     // Remove from map immediately
     externalServers.delete(port);
@@ -844,20 +856,6 @@ ipcMain.handle('kill-external-server', async (event, port: number) => {
     if (mainWindow) {
       mainWindow.webContents.send('external-servers-update', Array.from(externalServers.values()));
     }
-    
-    // Force kill after 2 seconds if needed
-    setTimeout(() => {
-      try {
-        // Check if process still exists
-        process.kill(server.pid, 0);
-        // If we get here, process is still alive, force kill it
-        console.log(`Process ${server.pid} still alive, forcing kill`);
-        process.kill(server.pid, 'SIGKILL');
-      } catch (e) {
-        // Process is already dead, which is what we want
-        console.log(`Process ${server.pid} successfully terminated`);
-      }
-    }, 2000);
     
     // Rescan after a short delay
     setTimeout(() => scanExternalServers(), 3000);
