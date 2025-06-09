@@ -144,7 +144,7 @@ app.whenReady().then(async () => {
   
   // Create mini window for macOS
   if (platform.isMac) {
-    createMiniWindow();
+    createMiniWindow(tray);
   }
   
   // Scan for external servers on startup
@@ -198,23 +198,33 @@ rm -f "${scriptPath}"
       console.error('Shell script method failed:', error);
     }
     
-    // Method 2: Direct open command (like your update script uses)
-    exec(`(sleep 1 && open -a "Dev Server Manager") &`, (error) => {
-      if (error) {
-        console.error('Direct open method failed:', error);
-        
-        // Method 3: AppleScript
-        const appName = app.getName();
-        exec(`osascript -e 'delay 1' -e 'tell application "${appName}" to activate' &`, (error2) => {
-          if (error2) {
-            console.error('AppleScript method failed:', error2);
-            app.relaunch();
-          }
-        });
-      }
-    });
-    app.exit(0);
+      // Method 2: Direct open command (like your update script uses)
+      exec(`(sleep 1 && open -a "Dev Server Manager") &`, (error) => {
+        if (error) {
+          console.error('Direct open method failed:', error);
+          
+          // Method 3: AppleScript
+          const appName = app.getName();
+          exec(`osascript -e 'delay 1' -e 'tell application "${appName}" to activate' &`, (error2) => {
+            if (error2) {
+              console.error('AppleScript method failed:', error2);
+              app.relaunch();
+            }
+          });
+        }
+      });
+      app.exit(0);
+    } else if (platform.isWindows) {
+      // Windows restart
+      app.relaunch();
+      app.quit();
+    } else {
+      // Linux restart
+      app.relaunch();
+      app.quit();
+    }
   } else {
+    // Not packaged - just relaunch
     app.relaunch();
     app.quit();
   }
@@ -874,4 +884,17 @@ ipcMain.handle('refresh-external-servers', async () => {
   console.log('Manual refresh of external servers requested');
   await scanExternalServers();
   return Array.from(externalServers.values());
+});
+
+// Handle app window events
+app.on('window-all-closed', () => {
+  if (!platform.isMac) {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
 });
