@@ -1,17 +1,17 @@
 {
   "name": "dev-server-manager",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "description": "Lightweight development server manager",
   "main": "dist/main.js",
   "scripts": {
     "build": "node scripts/build.js",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --publish never",
-    "dist:mac": "npm run build && electron-builder --mac --publish never",
-    "dist:win": "npm run build && electron-builder --win --publish never",
-    "dist:linux": "npm run build && electron-builder --linux --publish never",
-    "dist:all": "npm run build && electron-builder -mwl --publish never"
+    "dist": "npm run build && electron-builder --publish onTagOrDraft",
+    "dist:mac": "npm run build && electron-builder --mac --publish onTagOrDraft",
+    "dist:win": "npm run build && electron-builder --win --publish onTagOrDraft",
+    "dist:linux": "npm run build && electron-builder --linux --publish onTagOrDraft",
+    "dist:all": "npm run build && electron-builder -mwl --publish onTagOrDraft"
   },
   "keywords": [],
   "author": "",
