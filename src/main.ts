@@ -578,7 +578,9 @@ ipcMain.handle('start-server', async (event, projectPath: string) => {
         });
       } else {
         // Use cmd with quotes when npmPath contains a full path
-        serverProcess = spawn('cmd', ['/c', `"${npmPath}" run ${command}`], {
+        // Remove quotes from npmPath if they exist
+        const cleanNpmPath = npmPath.replace(/^"|"$/g, '');
+        serverProcess = spawn('cmd', ['/c', `"${cleanNpmPath}" run ${command}`], {
           cwd: projectPath,
           env,
           shell: false
