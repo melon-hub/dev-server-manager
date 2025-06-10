@@ -52,8 +52,17 @@ class DevServerManager {
     
     // Add project button
     document.getElementById('addProjectBtn')?.addEventListener('click', async () => {
-      const project = await window.electronAPI.selectDirectory();
-      if (project) {
+      const directoryPath = await window.electronAPI.selectDirectory();
+      if (directoryPath) {
+        // Create a project object from the directory path
+        const project: Project = {
+          id: Date.now().toString(),
+          name: directoryPath.split('/').pop() || 'Unknown',
+          path: directoryPath,
+          type: 'unknown',
+          status: 'stopped',
+          port: null
+        };
         this.projects.push(project);
         this.renderProjectList();
       }
@@ -106,7 +115,7 @@ class DevServerManager {
     const statuses = await window.electronAPI.getServerStatus();
     
     this.projects.forEach(project => {
-      const status = statuses[project.path];
+      const status = statuses.find((s: any) => s.path === project.path);
       if (status) {
         project.status = 'running';
         project.port = status.port;
