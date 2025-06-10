@@ -1,12 +1,13 @@
 {
   "name": "dev-server-manager",
-  "version": "2.0.10",
+  "version": "2.0.11",
   "description": "Lightweight development server manager",
   "main": "dist/main.js",
   "scripts": {
     "build": "node scripts/build.js",
+    "watch": "node scripts/build.js --watch",
     "start": "npm run build && electron .",
-    "dev": "npm run build && electron .",
+    "dev": "concurrently \"npm run watch\" \"nodemon --watch dist -e js --exec electron .\"",
     "dist": "npm run build && electron-builder --publish onTagOrDraft",
     "dist:mac": "npm run build && electron-builder --mac --publish onTagOrDraft",
     "dist:win": "npm run build && electron-builder --win --publish onTagOrDraft",
@@ -36,11 +37,12 @@
     "directories": {
       "output": "release"
     },
-    "publish": [{
+    "publish": {
       "provider": "github",
       "owner": "melon-hub",
-      "repo": "dev-server-manager"
-    }],
+      "repo": "dev-server-manager",
+      "releaseType": "release"
+    },
     "files": [
       "dist/**/*",
       "node_modules/**/*",
@@ -94,11 +96,6 @@
         "rpm"
       ],
       "category": "Development"
-    },
-    "publish": [{
-      "provider": "github",
-      "owner": "melon-hub",
-      "repo": "dev-server-manager"
-    }]
+    }
   }
 }

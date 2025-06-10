@@ -276,8 +276,18 @@ app.whenReady().then(async () => {
   }
   
   // Also keep the manual update check (for dev/testing)
-  watchForAppUpdates();
-  checkForVersionFile();
+  ipcMain.handle('check-for-updates', async () => {
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (error: any) {
+      console.error('Error checking for updates:', error);
+      mainWindow?.webContents.send('console-output', {
+        projectPath: 'system',
+        data: `Update error: ${error.message}\n`,
+        type: 'error'
+      });
+    }
+  });
   
   // Rescan external servers periodically
   setInterval(() => {
@@ -352,48 +362,6 @@ rm -f "${scriptPath}"
     // Not packaged - just relaunch
     app.relaunch();
     app.quit();
-  }
-}
-
-function watchForAppUpdates() {
-  const appPath = app.getPath('exe');
-  const appDir = path.dirname(appPath);
-  
-  // For macOS, watch the .app bundle
-  const watchPath = process.platform === 'darwin' ? 
-    path.resolve(appDir, '..', '..', '..') : appDir;
-  
-  console.log('Watching for updates at:', watchPath);
-  
-  // Watch for changes to the app bundle
-  fs.watchFile(watchPath, { interval: 5000 }, (curr, prev) => {
-    if (curr.mtime > prev.mtime && !updateNotificationShown) {
-      updateNotificationShown = true;
-      
-      // Show notification in renderer
-      mainWindow?.webContents.send('update-available');
-      
-      // Also show dialog
-      dialog.showMessageBox(mainWindow!, {
-        type: 'info',
-        title: 'Update Installed',
-        message: 'A new version of Dev Server Manager has been installed.',
-        detail: 'Please restart the app to use the new version.',
-        buttons: ['Restart Now', 'Later'],
-        defaultId: 0
-      }).then(response => {
-        if (response.response === 0) {
-          restartApp();
-        } else {
-          updateNotificationShown = false; // Allow showing again later
-        }
-      });
-    }
-  });
-  
-  // Also check if running from Applications folder
-  if (process.platform === 'darwin' && !appPath.includes('/Applications/')) {
-    console.log('App not running from Applications folder');
   }
 }
 
@@ -610,6 +578,40 @@ function detectProjectType(projectPath: string): string | null {
   }
 }
 
+function getWindowsCommand(projectType: string, projectPath: string): { executable: string, args: string[], needsShell: boolean } {
+    const script = getStartCommand(projectType);
+
+    // The most reliable method on Windows is to bypass .cmd wrappers and run the package's JS entry point directly with Node.
+    const findNodeScript = (jsPath: string) => {
+        const fullPath = path.join(projectPath, 'node_modules', jsPath);
+        return fs.existsSync(fullPath) ? fullPath : null;
+    };
+
+    let scriptPath: string | null = null;
+
+    switch(projectType) {
+        case 'nextjs':
+            scriptPath = findNodeScript('next/dist/bin/next.js');
+            break;
+        case 'vite':
+            scriptPath = findNodeScript('vite/bin/vite.js');
+            break;
+        case 'react':
+            scriptPath = findNodeScript('react-scripts/bin/react-scripts.js');
+            break;
+        case 'vue':
+             scriptPath = findNodeScript('@vue/cli-service/bin/vue-cli-service.js');
+             break;
+    }
+
+    if (scriptPath) {
+        return { executable: 'node', args: [scriptPath, script], needsShell: false };
+    }
+
+    // For generic 'npm' types or as a fallback if the script wasn't found, use the npm command.
+    return { executable: 'npm.cmd', args: ['run', script], needsShell: true };
+}
+
 ipcMain.handle('start-server', async (event, projectPath: string) => {
   if (activeServers.has(projectPath)) {
     return { success: false, error: 'Server already running' };
@@ -625,41 +627,28 @@ ipcMain.handle('start-server', async (event, projectPath: string) => {
     const port = await findAvailablePort();
     const startTime = new Date();
 
-    // Set environment variables with proper PATH
-    const env = { 
-      ...process.env, 
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
       PORT: port.toString(),
-      PATH: `/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/opt/local/bin:${process.env.PATH || ''}`,
-      // Force Next.js to use our chosen port
       NEXT_TELEMETRY_DISABLED: '1'
     };
 
-    if (!npmPath) {
-      return { success: false, error: 'npm not found' };
-    }
-
-    // On Windows, handle npm execution carefully
     let serverProcess: ChildProcess;
-    
+
     if (platform.isWindows) {
-      if (npmPath === 'npm') {
-        // Use npm directly with shell when npmPath is just 'npm'
-        serverProcess = spawn('npm', ['run', command], {
-          cwd: projectPath,
-          env,
-          shell: true
+        const commandDetails = getWindowsCommand(projectType, projectPath);
+        serverProcess = spawn(commandDetails.executable, commandDetails.args, {
+            cwd: projectPath,
+            env,
+            shell: commandDetails.needsShell
         });
-      } else {
-        // Always use npm with shell on Windows for reliability
-        console.log('Using npm with shell for Windows (most reliable method)');
-        serverProcess = spawn('npm', ['run', command], {
-          cwd: projectPath,
-          env,
-          shell: true
-        });
-      }
     } else {
-      serverProcess = spawn(npmPath, ['run', command], {
+      // On macOS/Linux, the existing logic is generally more reliable.
+      const nodeModulesBinPath = path.join(projectPath, 'node_modules', '.bin');
+      const pathKey = Object.keys(env).find(k => k.toLowerCase() === 'path') || 'PATH';
+      env[pathKey] = `${nodeModulesBinPath}:${env[pathKey] || ''}`;
+
+      serverProcess = spawn('npm', ['run', command], {
         cwd: projectPath,
         env,
         shell: platform.getShell()
