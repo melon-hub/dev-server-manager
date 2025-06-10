@@ -577,7 +577,7 @@ class DevServerManager {
     }
   }
   
-  addConsoleMessage(message: string, type: 'info' | 'error') {
+  addConsoleMessage(message: string, type: 'info' | 'error' | 'warning') {
     if (!this.selectedProject) return;
     
     if (!this.consoleOutput.has(this.selectedProject.path)) {

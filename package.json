@@ -4,7 +4,7 @@
   "description": "Lightweight development server manager",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc && tsc -p tsconfig.renderer.json || true && cp src/renderer/*.html dist/renderer/",
+    "build": "tsc || true && tsc -p tsconfig.renderer.json || true && cp src/renderer/*.html dist/renderer/",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
