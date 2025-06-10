@@ -30,14 +30,8 @@ jobs:
           npm config set msvs_version 2022
           npm config set python python3
           
-      - name: Remove package-lock.json
-        run: rm -f package-lock.json
-        shell: bash
-        
       - name: Install dependencies
-        run: |
-          npm cache clean --force
-          npm install --no-audit --no-fund
+        run: npm ci
         
       - name: Build
         run: npm run build
