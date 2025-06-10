@@ -179,7 +179,11 @@ app.whenReady().then(async () => {
   await scanExternalServers();
   
   // Setup auto-updater for GitHub releases
-  if (app.isPackaged) {
+  console.log('App packaged status:', app.isPackaged);
+  console.log('App version:', app.getVersion());
+  
+  // Always try to setup auto-updater
+  try {
     // Set the feed URL explicitly
     autoUpdater.setFeedURL({
       provider: 'github',
@@ -191,38 +195,60 @@ app.whenReady().then(async () => {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
     
-    // Check immediately
-    autoUpdater.checkForUpdates();
-    
-    // Check for updates every hour
-    setInterval(() => {
-      autoUpdater.checkForUpdatesAndNotify();
-    }, 60 * 60 * 1000);
-    
-    // Auto-updater events
+    // Auto-updater events - set these up before checking
     autoUpdater.on('checking-for-update', () => {
       console.log('Checking for update...');
+      mainWindow?.webContents.send('console-output', {
+        projectPath: 'system',
+        data: 'Checking for updates...\n',
+        type: 'info'
+      });
     });
     
     autoUpdater.on('update-available', (info) => {
       console.log('Update available:', info);
+      mainWindow?.webContents.send('console-output', {
+        projectPath: 'system',
+        data: `Update available: ${info.version}\n`,
+        type: 'success'
+      });
       mainWindow?.webContents.send('update-available');
     });
     
     autoUpdater.on('update-not-available', (info) => {
       console.log('Update not available:', info);
+      mainWindow?.webContents.send('console-output', {
+        projectPath: 'system',
+        data: 'Already running latest version\n',
+        type: 'info'
+      });
     });
     
     autoUpdater.on('error', (err) => {
       console.error('Update error:', err);
+      mainWindow?.webContents.send('console-output', {
+        projectPath: 'system',
+        data: `Update error: ${err.message}\n`,
+        type: 'error'
+      });
     });
     
     autoUpdater.on('download-progress', (progressObj) => {
       console.log(`Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`);
+      mainWindow?.webContents.send('console-output', {
+        projectPath: 'system',
+        data: `Downloading update: ${Math.round(progressObj.percent)}%\n`,
+        type: 'info'
+      });
     });
     
     autoUpdater.on('update-downloaded', (info) => {
       console.log('Update downloaded:', info);
+      mainWindow?.webContents.send('console-output', {
+        projectPath: 'system',
+        data: 'Update downloaded! Restart to apply.\n',
+        type: 'success'
+      });
       dialog.showMessageBox(mainWindow!, {
         type: 'info',
         title: 'Update Ready',
@@ -234,6 +260,19 @@ app.whenReady().then(async () => {
         }
       });
     });
+    
+    // Only check for updates if packaged
+    if (app.isPackaged) {
+      // Check immediately
+      autoUpdater.checkForUpdates();
+      
+      // Check for updates every hour
+      setInterval(() => {
+        autoUpdater.checkForUpdates();
+      }, 60 * 60 * 1000);
+    }
+  } catch (error) {
+    console.error('Failed to setup auto-updater:', error);
   }
   
   // Also keep the manual update check (for dev/testing)
