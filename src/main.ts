@@ -180,6 +180,13 @@ app.whenReady().then(async () => {
   
   // Setup auto-updater for GitHub releases
   if (app.isPackaged) {
+    // Set the feed URL explicitly
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'melon-hub',
+      repo: 'dev-server-manager'
+    });
+    
     autoUpdater.checkForUpdatesAndNotify();
     
     // Check for updates every hour
@@ -188,13 +195,29 @@ app.whenReady().then(async () => {
     }, 60 * 60 * 1000);
     
     // Auto-updater events
-    autoUpdater.on('update-available', () => {
-      console.log('Update available');
+    autoUpdater.on('checking-for-update', () => {
+      console.log('Checking for update...');
+    });
+    
+    autoUpdater.on('update-available', (info) => {
+      console.log('Update available:', info);
       mainWindow?.webContents.send('update-available');
     });
     
-    autoUpdater.on('update-downloaded', () => {
-      console.log('Update downloaded');
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('Update not available:', info);
+    });
+    
+    autoUpdater.on('error', (err) => {
+      console.error('Update error:', err);
+    });
+    
+    autoUpdater.on('download-progress', (progressObj) => {
+      console.log(`Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}%`);
+    });
+    
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('Update downloaded:', info);
       dialog.showMessageBox(mainWindow!, {
         type: 'info',
         title: 'Update Ready',
