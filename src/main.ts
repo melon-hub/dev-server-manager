@@ -132,6 +132,28 @@ app.whenReady().then(async () => {
   try {
     npmPath = findNpmPath();
     console.log('Found npm at:', npmPath);
+    
+    // Test if npm actually works with a simple command
+    try {
+      const testCmd = platform.isWindows 
+        ? `"${npmPath}" --version`
+        : `${npmPath} --version`;
+      const npmVersion = execSync(testCmd, { encoding: 'utf8' }).trim();
+      console.log('npm version:', npmVersion);
+    } catch (testError) {
+      console.error('npm test failed:', testError);
+      // Try to find npm in a different way on Windows
+      if (platform.isWindows) {
+        try {
+          const npmVersion = execSync('npm --version', { encoding: 'utf8' }).trim();
+          console.log('npm works with shell, version:', npmVersion);
+          // Use 'npm' directly with shell: true
+          npmPath = 'npm';
+        } catch (e) {
+          console.error('npm not accessible via shell either');
+        }
+      }
+    }
   } catch (error) {
     console.error('Failed to find npm:', error);
     dialog.showErrorBox('npm not found', 'Could not find npm. Please ensure Node.js is installed.');
@@ -150,7 +172,37 @@ app.whenReady().then(async () => {
   // Scan for external servers on startup
   await scanExternalServers();
   
-  // Watch for app updates
+  // Setup auto-updater for GitHub releases
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify();
+    
+    // Check for updates every hour
+    setInterval(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 60 * 60 * 1000);
+    
+    // Auto-updater events
+    autoUpdater.on('update-available', () => {
+      console.log('Update available');
+      mainWindow?.webContents.send('update-available');
+    });
+    
+    autoUpdater.on('update-downloaded', () => {
+      console.log('Update downloaded');
+      dialog.showMessageBox(mainWindow!, {
+        type: 'info',
+        title: 'Update Ready',
+        message: 'A new version has been downloaded. Restart the app to apply the update.',
+        buttons: ['Restart', 'Later']
+      }).then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall();
+        }
+      });
+    });
+  }
+  
+  // Also keep the manual update check (for dev/testing)
   watchForAppUpdates();
   checkForVersionFile();
   
@@ -357,13 +409,30 @@ ipcMain.handle('select-directory', async () => {
 });
 
 ipcMain.handle('scan-projects', async () => {
-  const homeDir = process.env.HOME || '';
-  const scanDirs = [
-    path.join(homeDir, 'Coding'),
-    path.join(homeDir, 'Projects'),
-    path.join(homeDir, 'Desktop'),
-    path.join(homeDir, 'Documents/Projects')
-  ];
+  // Check if running in WSL
+  const isWSL = process.platform === 'linux' && fs.existsSync('/mnt/c');
+  
+  let scanDirs: string[];
+  if (isWSL) {
+    // WSL paths
+    scanDirs = [
+      '/mnt/c/Users/Hoff/Desktop/Coding',
+      '/mnt/c/Users/Hoff/Coding',
+      '/mnt/c/Users/Hoff/Projects',
+      '/mnt/c/Users/Hoff/Desktop',
+      '/mnt/c/Users/Hoff/Documents/Projects'
+    ];
+  } else {
+    // Native Windows or Mac/Linux paths
+    const homeDir = platform.isWindows ? (process.env.USERPROFILE || '') : (process.env.HOME || '');
+    scanDirs = [
+      path.join(homeDir, 'Desktop', 'Coding'),
+      path.join(homeDir, 'Coding'),
+      path.join(homeDir, 'Projects'),
+      path.join(homeDir, 'Desktop'),
+      path.join(homeDir, 'Documents/Projects')
+    ];
+  }
 
   console.log('Scanning directories:', scanDirs);
   const projects = [];
@@ -496,11 +565,32 @@ ipcMain.handle('start-server', async (event, projectPath: string) => {
       return { success: false, error: 'npm not found' };
     }
 
-    const serverProcess = spawn(npmPath, ['run', command], {
-      cwd: projectPath,
-      env,
-      shell: platform.getShell()
-    });
+    // On Windows, handle npm execution carefully
+    let serverProcess: ChildProcess;
+    
+    if (platform.isWindows) {
+      if (npmPath === 'npm') {
+        // Use npm directly with shell when npmPath is just 'npm'
+        serverProcess = spawn('npm', ['run', command], {
+          cwd: projectPath,
+          env,
+          shell: true
+        });
+      } else {
+        // Use cmd with quotes when npmPath contains a full path
+        serverProcess = spawn('cmd', ['/c', `"${npmPath}" run ${command}`], {
+          cwd: projectPath,
+          env,
+          shell: false
+        });
+      }
+    } else {
+      serverProcess = spawn(npmPath, ['run', command], {
+        cwd: projectPath,
+        env,
+        shell: platform.getShell()
+      });
+    }
 
     activeServers.set(projectPath, {
       process: serverProcess,
@@ -511,26 +601,29 @@ ipcMain.handle('start-server', async (event, projectPath: string) => {
     });
 
     // Send console output to renderer
-    serverProcess.stdout.on('data', (data) => {
-      mainWindow?.webContents.send('console-output', {
-        projectPath,
-        data: data.toString(),
-        type: 'stdout'
+    if (serverProcess.stdout) {
+      serverProcess.stdout.on('data', (data) => {
+        mainWindow?.webContents.send('console-output', {
+          projectPath,
+          data: data.toString(),
+          type: 'stdout'
+        });
+        
+        // Update mini window with startTime
+        updateMiniWindow({
+          id: projectPath,
+          path: projectPath,
+          status: 'running' as const,
+          port,
+          name: path.basename(projectPath),
+          type: projectType,
+          startTime
+        });
       });
-      
-      // Update mini window with startTime
-      updateMiniWindow({
-        id: projectPath,
-        path: projectPath,
-        status: 'running' as const,
-        port,
-        name: path.basename(projectPath),
-        type: projectType,
-        startTime
-      });
-    });
+    }
 
-    serverProcess.stderr.on('data', (data) => {
+    if (serverProcess.stderr) {
+      serverProcess.stderr.on('data', (data) => {
       const output = data.toString();
       mainWindow?.webContents.send('console-output', {
         projectPath,
@@ -545,7 +638,8 @@ ipcMain.handle('start-server', async (event, projectPath: string) => {
         activeServers.delete(projectPath);
         mainWindow?.webContents.send('server-closed', { projectPath, code: 1 });
       }
-    });
+      });
+    }
 
     serverProcess.on('close', (code) => {
       activeServers.delete(projectPath);
@@ -584,14 +678,15 @@ ipcMain.handle('stop-server', async (event, projectPath: string) => {
 });
 
 ipcMain.handle('get-server-status', async () => {
-  const statuses: Record<string, any> = {};
+  const statuses: any[] = [];
   activeServers.forEach((server, projectPath) => {
-    statuses[projectPath] = {
+    statuses.push({
+      path: projectPath,
       running: true,
       port: server.port,
       command: server.command,
       startTime: server.startTime
-    };
+    });
   });
   return statuses;
 });

@@ -1,7 +1,7 @@
 interface ElectronAPI {
   // Project management
   scanProjects: () => Promise<any[]>;
-  selectDirectory: () => Promise<string | null>;
+  selectDirectory: () => Promise<any | null>;
   
   // Server control
   startServer: (projectPath: string) => Promise<any>;

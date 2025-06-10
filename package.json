@@ -1,10 +1,10 @@
 {
   "name": "dev-server-manager",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Lightweight development server manager",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc || true && tsc -p tsconfig.renderer.json || true && cp src/renderer/*.html dist/renderer/",
+    "build": "node scripts/build.js",
     "start": "npm run build && electron .",
     "dev": "npm run build && electron .",
     "dist": "npm run build && electron-builder --publish never",
@@ -36,6 +36,11 @@
     "directories": {
       "output": "release"
     },
+    "publish": [{
+      "provider": "github",
+      "owner": "melon-hub",
+      "repo": "dev-server-manager"
+    }],
     "files": [
       "dist/**/*",
       "node_modules/**/*",
