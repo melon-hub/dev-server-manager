@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false  # Don't cancel other builds if one fails
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
         
@@ -29,10 +30,13 @@ jobs:
           npm config set msvs_version 2022
           npm config set python python3
           
+      - name: Remove package-lock.json
+        run: rm -f package-lock.json
+        shell: bash
+        
       - name: Install dependencies
         run: |
           npm cache clean --force
-          rm -f package-lock.json
           npm install --no-audit --no-fund
         
       - name: Build
