@@ -983,6 +983,16 @@ ipcMain.handle('refresh-external-servers', async () => {
   return Array.from(externalServers.values());
 });
 
+// Handle manual update check
+ipcMain.handle('check-for-updates', async () => {
+  console.log('Manual update check requested');
+  if (app.isPackaged) {
+    const result = await autoUpdater.checkForUpdates();
+    return result;
+  }
+  return null;
+});
+
 // Handle app window events
 app.on('window-all-closed', () => {
   if (!platform.isMac) {

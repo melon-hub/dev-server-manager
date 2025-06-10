@@ -13,18 +13,18 @@ if not exist "release\latest.yml" (
     exit /b 1
 )
 
-if not exist "release\Dev Server Manager Setup 2.0.1.exe" (
+if not exist "release\Dev Server Manager Setup 2.0.2.exe" (
     echo ERROR: Installer not found! Build first with quick-update.bat
     pause
     exit /b 1
 )
 
 echo.
-echo Creating release v2.0.1...
-gh release create v2.0.1 ^
-    --title "Dev Server Manager v2.0.1" ^
-    --notes "## What's New\n- Fixed npm path issues with spaces in Program Files\n- Added automatic update checking via GitHub\n- Fixed server startup errors\n- Better error handling\n- Cross-platform build support\n\n## Auto-Updates Now Enabled!\nThis version will automatically check for updates. Future updates will download and install automatically." ^
-    "release\Dev Server Manager Setup 2.0.1.exe" ^
+echo Creating release v2.0.2...
+gh release create v2.0.2 ^
+    --title "Dev Server Manager v2.0.2" ^
+    --notes "## What's Changed\n\n### Bug Fixes\n- Fixed npm path double quote issue causing 'c:\program is not recognized' error\n- Properly clean npm path before using it in spawn command\n\n### Details\nThis release fixes a persistent issue where npm commands would fail due to extra quotes in the npm path on Windows systems.\n\n**Full Changelog**: https://github.com/melon-hub/dev-server-manager/compare/v2.0.1...v2.0.2" ^
+    "release\Dev Server Manager Setup 2.0.2.exe" ^
     "release\latest.yml"
 
 if errorlevel 1 (

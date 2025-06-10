@@ -1,6 +1,6 @@
 {
   "name": "dev-server-manager",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Lightweight development server manager",
   "main": "dist/main.js",
   "scripts": {
@@ -69,6 +69,7 @@
       ]
     },
     "win": {
+      "artifactName": "Dev-Server-Manager-Setup-${version}.exe",
       "target": [
         {
           "target": "nsis",
@@ -80,6 +81,7 @@
       ]
     },
     "nsis": {
+      "artifactName": "Dev-Server-Manager-Setup-${version}.exe",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
