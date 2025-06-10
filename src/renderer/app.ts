@@ -83,6 +83,41 @@ class DevServerManager {
     window.electronAPI.onUpdateAvailable(() => {
       this.showUpdateNotification();
     });
+    
+    // Add click handler for version info to check for updates
+    document.getElementById('versionInfo')?.addEventListener('click', async () => {
+      const versionDiv = document.getElementById('versionInfo');
+      if (versionDiv) {
+        const originalText = versionDiv.textContent;
+        versionDiv.textContent = 'Checking for updates...';
+        versionDiv.style.color = '#3b82f6';
+        
+        try {
+          const result = await window.electronAPI.checkForUpdates();
+          if (result) {
+            versionDiv.textContent = 'Update check started';
+            setTimeout(() => {
+              versionDiv.textContent = originalText;
+              versionDiv.style.color = '';
+            }, 2000);
+          } else {
+            versionDiv.textContent = 'Already up to date';
+            setTimeout(() => {
+              versionDiv.textContent = originalText;
+              versionDiv.style.color = '';
+            }, 2000);
+          }
+        } catch (error) {
+          console.error('Update check failed:', error);
+          versionDiv.textContent = 'Update check failed';
+          versionDiv.style.color = '#dc2626';
+          setTimeout(() => {
+            versionDiv.textContent = originalText;
+            versionDiv.style.color = '';
+          }, 2000);
+        }
+      }
+    });
   }
   
   async loadProjects() {

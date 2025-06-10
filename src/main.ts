@@ -187,7 +187,12 @@ app.whenReady().then(async () => {
       repo: 'dev-server-manager'
     });
     
-    autoUpdater.checkForUpdatesAndNotify();
+    // Enable auto-download
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    
+    // Check immediately
+    autoUpdater.checkForUpdates();
     
     // Check for updates every hour
     setInterval(() => {

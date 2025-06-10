@@ -35,5 +35,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   restartApp: () => ipcRenderer.invoke('restart-app'),
   toggleDebugDrawer: () => ipcRenderer.invoke('toggle-debug-drawer'),
-  openExternal: (url: string) => ipcRenderer.invoke('open-external', url)
+  openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates')
 });

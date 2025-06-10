@@ -28,6 +28,7 @@ interface ElectronAPI {
   // Updates
   onUpdateAvailable: (callback: () => void) => void;
   restartApp: () => Promise<void>;
+  checkForUpdates: () => Promise<any>;
   
   // Utilities
   toggleDebugDrawer: () => Promise<void>;
