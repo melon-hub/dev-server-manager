@@ -19,7 +19,7 @@
   "devDependencies": {
     "@types/node": "^20.19.0",
     "electron": "^36.4.0",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "^24.13.3",
     "electron-store": "^10.0.1"
   },
   "dependencies": {
