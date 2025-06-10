@@ -583,28 +583,13 @@ ipcMain.handle('start-server', async (event, projectPath: string) => {
           shell: true
         });
       } else {
-        // Clean the npm path first - remove quotes and normalize slashes
-        let cleanNpmPath = npmPath.replace(/^"|"$/g, '');
-        console.log('Original npm path:', npmPath);
-        console.log('Cleaned npm path:', cleanNpmPath);
-        
-        // Check if the path exists
-        if (!fs.existsSync(cleanNpmPath)) {
-          console.error('npm path does not exist:', cleanNpmPath);
-          // Fallback to using npm with shell
-          serverProcess = spawn('npm', ['run', command], {
-            cwd: projectPath,
-            env,
-            shell: true
-          });
-        } else {
-          // Use the clean path
-          serverProcess = spawn('cmd', ['/c', `"${cleanNpmPath}" run ${command}`], {
-            cwd: projectPath,
-            env,
-            shell: false
-          });
-        }
+        // Always use npm with shell on Windows for reliability
+        console.log('Using npm with shell for Windows (most reliable method)');
+        serverProcess = spawn('npm', ['run', command], {
+          cwd: projectPath,
+          env,
+          shell: true
+        });
       }
     } else {
       serverProcess = spawn(npmPath, ['run', command], {
