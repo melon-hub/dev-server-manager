@@ -39,8 +39,11 @@ function findNpmPath(): string {
     const npmPathFromCommand = execSync(findCommand, { encoding: 'utf8' }).trim();
     if (npmPathFromCommand) {
       // On Windows, 'where' might return multiple paths, take the first one
-      const firstPath = npmPathFromCommand.split('\n')[0].trim();
+      let firstPath = npmPathFromCommand.split('\n')[0].trim();
+      // Remove any quotes that might be in the path
+      firstPath = firstPath.replace(/^"|"$/g, '');
       if (fs.existsSync(firstPath)) {
+        console.log('Found npm via where/which command:', firstPath);
         return firstPath;
       }
     }
@@ -135,13 +138,16 @@ app.whenReady().then(async () => {
     
     // Test if npm actually works with a simple command
     try {
+      // Remove quotes for the test command
+      const cleanNpmPath = npmPath.replace(/^"|"$/g, '');
       const testCmd = platform.isWindows 
-        ? `"${npmPath}" --version`
+        ? `"${cleanNpmPath}" --version`
         : `${npmPath} --version`;
       const npmVersion = execSync(testCmd, { encoding: 'utf8' }).trim();
       console.log('npm version:', npmVersion);
     } catch (testError) {
       console.error('npm test failed:', testError);
+      console.error('npm path was:', npmPath);
       // Try to find npm in a different way on Windows
       if (platform.isWindows) {
         try {
@@ -577,14 +583,28 @@ ipcMain.handle('start-server', async (event, projectPath: string) => {
           shell: true
         });
       } else {
-        // Use cmd with quotes when npmPath contains a full path
-        // Remove quotes from npmPath if they exist
-        const cleanNpmPath = npmPath.replace(/^"|"$/g, '');
-        serverProcess = spawn('cmd', ['/c', `"${cleanNpmPath}" run ${command}`], {
-          cwd: projectPath,
-          env,
-          shell: false
-        });
+        // Clean the npm path first - remove quotes and normalize slashes
+        let cleanNpmPath = npmPath.replace(/^"|"$/g, '');
+        console.log('Original npm path:', npmPath);
+        console.log('Cleaned npm path:', cleanNpmPath);
+        
+        // Check if the path exists
+        if (!fs.existsSync(cleanNpmPath)) {
+          console.error('npm path does not exist:', cleanNpmPath);
+          // Fallback to using npm with shell
+          serverProcess = spawn('npm', ['run', command], {
+            cwd: projectPath,
+            env,
+            shell: true
+          });
+        } else {
+          // Use the clean path
+          serverProcess = spawn('cmd', ['/c', `"${cleanNpmPath}" run ${command}`], {
+            cwd: projectPath,
+            env,
+            shell: false
+          });
+        }
       }
     } else {
       serverProcess = spawn(npmPath, ['run', command], {
